@@ -1,5 +1,4 @@
 use std::future::Future;
-use std::pin::Pin;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
@@ -41,13 +40,27 @@ pub mod ice_role;
 pub mod ice_server;
 pub mod ice_transport_state;
 
-// TODO: Can't be reworked due to the dynamically inferred return type in the callback,
-//       that set in webrtc::peer_connection::peer_connection_internal::PeerConnectionInternal::create_ice_transport()
-pub type OnConnectionStateChangeHdlrFn = Box<
-    dyn (FnMut(RTCIceTransportState) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>)
-        + Send
-        + Sync,
->;
+// pub type OnConnectionStateChangeHdlrFn = Box<
+//     dyn (FnMut(RTCIceTransportState) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>)
+//         + Send
+//         + Sync,
+// >;
+
+#[async_trait]
+pub trait OnConnectionStateChangeHdlrFn: Send + Sync {
+    async fn call(&mut self, s: RTCIceTransportState);
+}
+
+#[async_trait]
+impl<T, F> OnConnectionStateChangeHdlrFn for F
+where
+    F: FnMut(RTCIceTransportState) -> T + Send + Sync,
+    T: Future<Output = ()> + Send,
+{
+    async fn call(&mut self, s: RTCIceTransportState) {
+        (*self)(s).await
+    }
+}
 
 // pub type OnSelectedCandidatePairChangeHdlrFn = Box<
 //     dyn (FnMut(RTCIceCandidatePair) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>)
@@ -84,7 +97,7 @@ struct ICETransportInternal {
 #[derive(Default)]
 pub struct RTCIceTransport {
     pub(crate) gatherer: Arc<RTCIceGatherer>,
-    on_connection_state_change_handler: Arc<Mutex<Option<OnConnectionStateChangeHdlrFn>>>,
+    on_connection_state_change_handler: Arc<Mutex<Option<Box<dyn OnConnectionStateChangeHdlrFn>>>>,
     on_selected_candidate_pair_change_handler:
         Arc<Mutex<Option<Box<dyn OnSelectedCandidatePairChangeHdlrFn>>>>,
     state: Arc<AtomicU8>, // ICETransportState
@@ -136,7 +149,7 @@ impl RTCIceTransport {
                     Box::pin(async move {
                         let mut handler = on_connection_state_change_handler_clone.lock().await;
                         if let Some(f) = &mut *handler {
-                            f(s).await;
+                            f.call(s).await;
                         }
                     })
                 }))
@@ -275,7 +288,7 @@ impl RTCIceTransport {
 
     /// on_connection_state_change sets a handler that is fired when the ICE
     /// connection state changes.
-    pub async fn on_connection_state_change(&self, f: OnConnectionStateChangeHdlrFn) {
+    pub async fn on_connection_state_change(&self, f: Box<dyn OnConnectionStateChangeHdlrFn>) {
         let mut on_connection_state_change_handler =
             self.on_connection_state_change_handler.lock().await;
         *on_connection_state_change_handler = Some(f);

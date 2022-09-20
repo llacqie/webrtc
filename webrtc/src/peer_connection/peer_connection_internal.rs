@@ -1304,12 +1304,9 @@ impl PeerConnectionInternal {
                     RTCIceTransportState::Failed => RTCIceConnectionState::Failed,
                     RTCIceTransportState::Disconnected => RTCIceConnectionState::Disconnected,
                     RTCIceTransportState::Closed => RTCIceConnectionState::Closed,
-                    _ => {
-                        log::warn!("on_connection_state_change: unhandled ICE state: {}", state);
-                        return Box::pin(async {});
-                    }
+                    RTCIceTransportState::Unspecified => RTCIceConnectionState::Unspecified,
                 };
-
+                
                 let ice_connection_state2 = Arc::clone(&ice_connection_state);
                 let on_ice_connection_state_change_handler2 =
                     Arc::clone(&on_ice_connection_state_change_handler);
@@ -1319,21 +1316,26 @@ impl PeerConnectionInternal {
                 let dtls_transport_state = dtls_transport.state();
                 let peer_connection_state2 = Arc::clone(&peer_connection_state);
                 Box::pin(async move {
-                    RTCPeerConnection::do_ice_connection_state_change(
-                        &on_ice_connection_state_change_handler2,
-                        &ice_connection_state2,
-                        cs,
-                    )
-                    .await;
+                    match cs {
+                        RTCIceConnectionState::Unspecified => {}
+                        _ => {
+                            RTCPeerConnection::do_ice_connection_state_change(
+                                &on_ice_connection_state_change_handler2,
+                                &ice_connection_state2,
+                                cs,
+                            )
+                            .await;
 
-                    RTCPeerConnection::update_connection_state(
-                        &on_peer_connection_state_change_handler2,
-                        &is_closed2,
-                        &peer_connection_state2,
-                        cs,
-                        dtls_transport_state,
-                    )
-                    .await;
+                            RTCPeerConnection::update_connection_state(
+                                &on_peer_connection_state_change_handler2,
+                                &is_closed2,
+                                &peer_connection_state2,
+                                cs,
+                                dtls_transport_state,
+                            )
+                            .await;
+                        }
+                    }
                 })
             }))
             .await;
