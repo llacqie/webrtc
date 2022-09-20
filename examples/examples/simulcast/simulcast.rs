@@ -157,6 +157,7 @@ async fn main() -> Result<()> {
     peer_connection
         .on_track(Box::new(
             move |track: Option<Arc<TrackRemote>>, _receiver: Option<Arc<RTCRtpReceiver>>| {
+                let result = async {};
                 if let Some(track) = track {
                     println!("Track has started");
 
@@ -165,7 +166,7 @@ async fn main() -> Result<()> {
                         Arc::clone(output_track)
                     } else {
                         println!("output_track not found for rid = {}", rid);
-                        return Box::pin(async {});
+                        return result;
                     };
 
                     // Start reading from all the streams and sending them to the related output track
@@ -213,7 +214,7 @@ async fn main() -> Result<()> {
                         println!("exit track loop {}", track.rid());
                     });
                 }
-                Box::pin(async {})
+                result
             },
         ))
         .await;

@@ -311,7 +311,7 @@ async fn test_get_stats() -> Result<()> {
         .on_track(Box::new(
             move |track: Option<Arc<TrackRemote>>, _: Option<Arc<RTCRtpReceiver>>| {
                 let packet_tx = packet_tx.clone();
-                let result = Box::pin(async move {});
+                let result = async {};
                 let track = match track {
                     Some(t) => t,
                     None => return result,
@@ -329,7 +329,7 @@ async fn test_get_stats() -> Result<()> {
                     }
                 });
 
-                Box::pin(async move {})
+                result
             },
         ))
         .await;

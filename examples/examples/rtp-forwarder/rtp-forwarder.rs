@@ -179,12 +179,14 @@ async fn main() -> Result<()> {
     peer_connection
         .on_track(Box::new(
             move |track: Option<Arc<TrackRemote>>, _receiver: Option<Arc<RTCRtpReceiver>>| {
+                let result = async {};
+
                 if let Some(track) = track {
                     // Retrieve udp connection
                     let c = if let Some(c) = udp_conns.get(&track.kind().to_string()) {
                         c.clone()
                     } else {
-                        return Box::pin(async {});
+                        return result;
                     };
 
                     // Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
@@ -248,7 +250,7 @@ async fn main() -> Result<()> {
                     });
                 }
 
-                Box::pin(async {})
+                result
             },
         ))
         .await;

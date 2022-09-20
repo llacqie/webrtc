@@ -201,6 +201,8 @@ async fn main() -> Result<()> {
     peer_connection
         .on_track(Box::new(
             move |track: Option<Arc<TrackRemote>>, _receiver: Option<Arc<RTCRtpReceiver>>| {
+                let result = async {};
+
                 if let Some(track) = track {
                     // Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
                     // This is a temporary fix until we implement incoming RTCP events, then we would push a PLI only when a viewer requests it
@@ -239,7 +241,7 @@ async fn main() -> Result<()> {
                         Arc::clone(output_track)
                     } else {
                         println!("output_track not found for type = {}", kind);
-                        return Box::pin(async {});
+                        return result;
                     };
 
                     let output_track2 = Arc::clone(&output_track);
@@ -264,7 +266,7 @@ async fn main() -> Result<()> {
                         );
                     });
                 }
-                Box::pin(async {})
+                result
             },
         ))
         .await;

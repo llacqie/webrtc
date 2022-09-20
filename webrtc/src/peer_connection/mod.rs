@@ -186,16 +186,30 @@ pub type OnDataChannelHdlrFn = Box<
         + Sync,
 >;
 
-// TODO: Can't be reworked due to the dynamically inferred return type in the callback,
-//       that set in webrtc::peer_connection::peer_connection_test::test_get_stats()
-pub type OnTrackHdlrFn = Box<
-    dyn (FnMut(
-            Option<Arc<TrackRemote>>,
-            Option<Arc<RTCRtpReceiver>>,
-        ) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>)
-        + Send
-        + Sync,
->;
+// pub type OnTrackHdlrFn = Box<
+//     dyn (FnMut(
+//             Option<Arc<TrackRemote>>,
+//             Option<Arc<RTCRtpReceiver>>,
+//         ) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>)
+//         + Send
+//         + Sync,
+// >;
+
+#[async_trait]
+pub trait OnTrackHdlrFn: Send + Sync {
+    async fn call(&mut self, t: Option<Arc<TrackRemote>>, r: Option<Arc<RTCRtpReceiver>>);
+}
+
+#[async_trait]
+impl<T, F> OnTrackHdlrFn for F
+where
+    F: FnMut(Option<Arc<TrackRemote>>, Option<Arc<RTCRtpReceiver>>) -> T + Send + Sync,
+    T: Future<Output = ()> + Send,
+{
+    async fn call(&mut self, t: Option<Arc<TrackRemote>>, r: Option<Arc<RTCRtpReceiver>>) {
+        (*self)(t, r).await
+    }
+}
 
 // pub type OnNegotiationNeededHdlrFn =
 //     Box<dyn (FnMut() -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>) + Send + Sync>;
@@ -651,13 +665,13 @@ impl RTCPeerConnection {
 
     /// on_track sets an event handler which is called when remote track
     /// arrives from a remote peer.
-    pub async fn on_track(&self, f: OnTrackHdlrFn) {
+    pub async fn on_track(&self, f: Box<dyn OnTrackHdlrFn>) {
         let mut on_track_handler = self.internal.on_track_handler.lock().await;
         *on_track_handler = Some(f);
     }
 
     async fn do_track(
-        on_track_handler: Arc<Mutex<Option<OnTrackHdlrFn>>>,
+        on_track_handler: Arc<Mutex<Option<Box<dyn OnTrackHdlrFn>>>>,
         t: Option<Arc<TrackRemote>>,
         r: Option<Arc<RTCRtpReceiver>>,
     ) {
@@ -667,7 +681,7 @@ impl RTCPeerConnection {
             tokio::spawn(async move {
                 let mut handler = on_track_handler.lock().await;
                 if let Some(f) = &mut *handler {
-                    f(t, r).await;
+                    f.call(t, r).await;
                 } else {
                     log::warn!("on_track unset, unable to handle incoming media streams");
                 }

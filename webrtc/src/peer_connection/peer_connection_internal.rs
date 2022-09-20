@@ -44,7 +44,7 @@ pub(crate) struct PeerConnectionInternal {
     pub(super) sctp_transport: Arc<RTCSctpTransport>,
     pub(super) rtp_transceivers: Arc<Mutex<Vec<Arc<RTCRtpTransceiver>>>>,
 
-    pub(super) on_track_handler: Arc<Mutex<Option<OnTrackHdlrFn>>>,
+    pub(super) on_track_handler: Arc<Mutex<Option<Box<dyn OnTrackHdlrFn>>>>,
     pub(super) on_signaling_state_change_handler:
         Arc<Mutex<Option<Box<dyn OnSignalingStateChangeHdlrFn>>>>,
     pub(super) on_ice_connection_state_change_handler:
@@ -1237,7 +1237,7 @@ impl PeerConnectionInternal {
         receive_mtu: usize,
         incoming: &TrackDetails,
         receiver: Arc<RTCRtpReceiver>,
-        on_track_handler: Arc<Mutex<Option<OnTrackHdlrFn>>>,
+        on_track_handler: Arc<Mutex<Option<Box<dyn OnTrackHdlrFn>>>>,
     ) {
         receiver.start(incoming).await;
         for t in receiver.tracks().await {
@@ -1306,7 +1306,7 @@ impl PeerConnectionInternal {
                     RTCIceTransportState::Closed => RTCIceConnectionState::Closed,
                     RTCIceTransportState::Unspecified => RTCIceConnectionState::Unspecified,
                 };
-                
+
                 let ice_connection_state2 = Arc::clone(&ice_connection_state);
                 let on_ice_connection_state_change_handler2 =
                     Arc::clone(&on_ice_connection_state_change_handler);

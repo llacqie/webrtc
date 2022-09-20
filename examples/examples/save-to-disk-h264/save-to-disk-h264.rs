@@ -206,51 +206,56 @@ async fn main() -> Result<()> {
     // In your application this is where you would handle/process video
     let pc = Arc::downgrade(&peer_connection);
     peer_connection.on_track(Box::new(move |track: Option<Arc<TrackRemote>>, _receiver: Option<Arc<RTCRtpReceiver>>| {
-        if let Some(track) = track {
-            // Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
-            let media_ssrc = track.ssrc();
-            let pc2 = pc.clone();
-            tokio::spawn(async move {
-                let mut result = Result::<usize>::Ok(0);
-                while result.is_ok() {
-                    let timeout = tokio::time::sleep(Duration::from_secs(3));
-                    tokio::pin!(timeout);
+        let pc = pc.clone();
 
-                    tokio::select! {
-                        _ = timeout.as_mut() =>{
-                            if let Some(pc) = pc2.upgrade(){
-                                result = pc.write_rtcp(&[Box::new(PictureLossIndication{
-                                    sender_ssrc: 0,
-                                    media_ssrc,
-                                })]).await.map_err(Into::into);
-                            }else {
-                                break;
+        let notify_rx = notify_rx.clone();
+        let h264_writer = h264_writer.clone();
+        let ogg_writer = ogg_writer.clone();
+
+        async move {
+            if let Some(track) = track {
+                // Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
+                let media_ssrc = track.ssrc();
+                tokio::spawn(async move {
+                    let mut result = Result::<usize>::Ok(0);
+                    while result.is_ok() {
+                        let timeout = tokio::time::sleep(Duration::from_secs(3));
+                        tokio::pin!(timeout);
+
+                        tokio::select! {
+                            _ = timeout.as_mut() => {
+                                if let Some(pc) = pc.upgrade() {
+                                    result = pc
+                                        .write_rtcp(&[Box::new(PictureLossIndication {
+                                            sender_ssrc: 0,
+                                            media_ssrc,
+                                        })])
+                                        .await
+                                        .map_err(Into::into);
+                                } else {
+                                    break;
+                                }
                             }
-                        }
-                    };
-                }
-            });
+                        };
+                    }
+                });
 
-            let notify_rx2 = Arc::clone(&notify_rx);
-            let h264_writer2 = Arc::clone(&h264_writer);
-            let ogg_writer2 = Arc::clone(&ogg_writer);
-            Box::pin(async move {
-                let codec = track.codec().await;
-                let mime_type = codec.capability.mime_type.to_lowercase();
-                if mime_type == MIME_TYPE_OPUS.to_lowercase() {
-                    println!("Got Opus track, saving to disk as output.opus (48 kHz, 2 channels)");     
-                    tokio::spawn(async move {
-                        let _ = save_to_disk(ogg_writer2, track, notify_rx2).await;
-                    });
-                } else if mime_type == MIME_TYPE_H264.to_lowercase() {
-                    println!("Got h264 track, saving to disk as output.h264");
-                     tokio::spawn(async move {
-                         let _ = save_to_disk(h264_writer2, track, notify_rx2).await;
-                     });
-                }
-            })
-        }else {
-            Box::pin(async {})
+                async move {
+                    let codec = track.codec().await;
+                    let mime_type = codec.capability.mime_type.to_lowercase();
+                    if mime_type == MIME_TYPE_OPUS.to_lowercase() {
+                        println!("Got Opus track, saving to disk as output.opus (48 kHz, 2 channels)");     
+                        tokio::spawn(async move {
+                            let _ = save_to_disk(ogg_writer, track, notify_rx).await;
+                        });
+                    } else if mime_type == MIME_TYPE_H264.to_lowercase() {
+                        println!("Got h264 track, saving to disk as output.h264");
+                         tokio::spawn(async move {
+                             let _ = save_to_disk(h264_writer, track, notify_rx).await;
+                         });
+                    }
+                }.await
+            }
         }
 	})).await;
 
