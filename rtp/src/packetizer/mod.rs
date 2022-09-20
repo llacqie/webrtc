@@ -57,6 +57,7 @@ pub trait Depacketizer {
 //TODO: SystemTime vs Instant?
 // non-monotonic clock vs monotonically non-decreasing clock
 /// FnTimeGen provides current SystemTime
+// TODO: Rework
 pub type FnTimeGen =
     Arc<dyn (Fn() -> Pin<Box<dyn Future<Output = SystemTime> + Send + 'static>>) + Send + Sync>;
 

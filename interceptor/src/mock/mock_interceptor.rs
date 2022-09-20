@@ -28,8 +28,11 @@ pub type BindLocalStreamFn = Box<
         + Send
         + Sync,
 >;
+
+// TODO: Rework
 pub type UnbindLocalStreamFn =
     Box<dyn (Fn(&StreamInfo) -> Pin<Box<dyn Future<Output = ()> + Send + Sync>>) + Send + Sync>;
+
 pub type BindRemoteStreamFn = Box<
     dyn (Fn(
             &StreamInfo,
@@ -38,8 +41,12 @@ pub type BindRemoteStreamFn = Box<
         + Send
         + Sync,
 >;
+
+// TODO: Rework
 pub type UnbindRemoteStreamFn =
     Box<dyn (Fn(&StreamInfo) -> Pin<Box<dyn Future<Output = ()> + Send + Sync>>) + Send + Sync>;
+
+// TODO: Rework
 pub type CloseFn =
     Box<dyn (Fn() -> Pin<Box<dyn Future<Output = Result<()>> + Send + Sync>>) + Send + Sync>;
 

@@ -166,6 +166,7 @@ pub(crate) fn create_stream_info(
     }
 }
 
+// TODO: Rework
 pub type TriggerNegotiationNeededFnOption =
     Option<Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send + Sync>> + Send + Sync>>;
 

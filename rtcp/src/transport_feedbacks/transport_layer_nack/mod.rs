@@ -24,6 +24,7 @@ pub struct NackPair {
     pub lost_packets: PacketBitmap,
 }
 
+// TODO: Rework
 pub type RangeFn =
     Box<dyn (Fn(u16) -> Pin<Box<dyn Future<Output = bool> + Send + 'static>>) + Send + Sync>;
 
